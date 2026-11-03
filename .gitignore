@@ -1,0 +1,10 @@
+# Secretos y conexiones (nunca subir)
+.env
+.env.*
+!.env.example
+
+# Respaldos y volcados de base de datos (pueden contener datos de clientes)
+backups/
+*.dump
+*.backup
+dumps/
