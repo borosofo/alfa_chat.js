@@ -22,10 +22,12 @@ volver a descargar en Ollama.
 ### Pendientes
 
 - Revisar que "ML - Refresh Token" corra bien a las 20:00 UTC (15:00 Bogotá) contra el oficial.
-- Proyecto viejo `pgeyfvjmdzvwqdbdvbhn`: tiene RLS apagado en `conocimiento_alfa`,
-  `n8n_chat_histories`, `documents`, `tipos_negocio`, `negocio_familias` (cualquiera con su clave
-  anon puede leer los chats). Cuando se confirme el corte: activar RLS o pausar el proyecto.
-- "Chatbot Alfa para la demo" sigue en el proyecto viejo (decisión pendiente del dueño).
+- Proyecto viejo `pgeyfvjmdzvwqdbdvbhn`: decisión del dueño = **pausarlo y luego borrarlo**.
+  Mientras siga activo tiene RLS apagado en `conocimiento_alfa`, `n8n_chat_histories`,
+  `documents`, `tipos_negocio`, `negocio_familias`. Antes de borrarlo, guardar el respaldo
+  `backups/origen_*.dump` en un lugar seguro (al pausarlo se pierde el plan de regreso rápido).
+- "Chatbot Alfa para la demo" sigue en el proyecto viejo; no se usa por ahora. Si se pausa el
+  proyecto viejo, ese chatbot deja de funcionar.
 - Cualquier carga nueva a la base de conocimiento debe usar `text-embedding-3-small` (1536).
 
 ## Objetivo
