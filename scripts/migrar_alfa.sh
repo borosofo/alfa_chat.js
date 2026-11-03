@@ -125,11 +125,11 @@ DO \$\$ DECLARE r record; BEGIN
                    r.seq, r.column_name, r.table_name);
   END LOOP;
 END \$\$;
--- El índice ivfflat se creó con la tabla vacía: reconstruirlo con los datos reales
-REINDEX INDEX public.conocimiento_alfa_embedding_idx;
+-- Reconstruir el índice vectorial con los datos reales
+REINDEX TABLE public.conocimiento_alfa;
 COMMIT;
-ANALYZE;
 EOF
+      for t in "${TABLAS[@]}"; do echo "ANALYZE public.$t;"; done
     } > "$SQL"
     echo "Aplicando en el destino (una sola transacción; si algo falla no se aplica nada)..."
     "${PSQL[@]}" "$TARGET_DB_URL" -f "$SQL" >/dev/null
