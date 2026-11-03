@@ -1,6 +1,7 @@
 # Migración de Alfa al Supabase oficial
 
-Estado: **fase 0 (inventario)**. Todavía no se ha escrito nada en ninguna base de datos ni en n8n.
+Estado: **inventario del destino hecho; falta correr respaldo y comparación contra el origen**.
+Todavía no se ha escrito nada en ninguna base de datos ni en n8n.
 
 ## Objetivo
 
@@ -15,7 +16,7 @@ El destino ya **no** es el Supabase autoalojado del VPS: no se toca el VPS ni na
 | Proyecto | Credencial(es) en n8n | Rol |
 |---|---|---|
 | `pgeyfvjmdzvwqdbdvbhn` (cuenta personal) | "Supabase Alfa" (supabaseApi), "Memoria de chatbot de Alfa demo" (postgres, pooler `aws-1-us-west-2`) | **Origen**: lo que usa hoy el chatbot en producción |
-| Oficial de Alfa (cuenta empresa, ref pendiente) | "Memoria chat Alfa oficial" (postgres) | **Destino**. Ya tiene las tablas del chatbot, con datos desactualizados |
+| `tuulhxyttqadxiamscfq` oficial (cuenta empresa, us-west-1) | "Memoria chat Alfa oficial" (postgres) | **Destino**. Ya tiene las tablas del chatbot, con datos desactualizados |
 | `whxonevevculhcxhmcgy` (cuenta personal) | "Supabase MIGA" | Supabase cloud antiguo de Miga. **No se edita ni se borra la credencial.** |
 
 ## Qué usa el chatbot hoy
@@ -34,41 +35,98 @@ Workflow n8n **"Chatbot Alfa - Formato Mejorado"** (`87Jy57D6PgHrWeWOcfMmD`), we
 | Recetas Alfa | Memoria de chatbot de Alfa demo | `recetas`, `receta_ingredientes_alfa`, `receta_ingredientes_externos`, `productos_alfa`, `f_unaccent()` |
 | Recomendador por Tipo de Negocio | Memoria de chatbot de Alfa demo | `tipos_negocio`, `negocio_familias`, `productos_alfa`, `unaccent()` |
 
-Tablas que ya existen en el proyecto oficial: `conocimiento_alfa`, `documents`,
-`ml_catalog_match`, `ml_credentials`, `ml_products`, `n8n_chat_histories`, `negocio_familias`,
-`productos_alfa`, `receta_ingredientes_alfa`, `receta_ingredientes_externos`, `recetas`,
-`tipos_negocio`.
+### Estado del destino (`tuulhxyttqadxiamscfq`, revisado 2026-11-03)
 
-## Pendiente de revisar (workflows sin acceso MCP)
+| Tabla | Filas | Nota |
+|---|---|---|
+| conocimiento_alfa | **0** | Base de conocimiento vacía: el chatbot no respondería bien hoy |
+| documents | 0 | |
+| ml_products | 255 | Última actualización 2026-05-11 |
+| ml_catalog_match | 255 | |
+| ml_credentials | 1 | Token de ML viejo |
+| n8n_chat_histories | 104 | Se reemplaza por el historial del origen |
+| productos_alfa | 304 | Trigger `trg_productos_alfa_search` |
+| recetas / receta_ingredientes_alfa / receta_ingredientes_externos | 35 / 236 / 150 | |
+| tipos_negocio / negocio_familias | 7 / 35 | |
 
-Hay que saber a qué base escriben, porque después del corte deben apuntar al oficial:
+- Extensiones: `vector` 0.8.0 (en `public`), `unaccent`, `pg_trgm` (en `extensions`).
+- Funciones: `f_unaccent`, `match_documents(vector,int,jsonb)`, `update_productos_alfa_search`.
+- RLS activo en todas las tablas y **sin políticas**: anon/authenticated no pueden leer ni
+  escribir (los grants existen, pero RLS los bloquea). Es el estado deseado: n8n entra con el
+  usuario `postgres`/service_role, que no pasa por RLS.
+- El índice ivfflat de `conocimiento_alfa` se creó con la tabla vacía; el script lo reconstruye
+  después de copiar.
 
-- **Registro Proveedores - Comestibles Alfa** (`to04FDcosAGyW7RJ1FkRo`): lo llama el widget.
-- **ML - sync** (`nsA4A6bnfypPnDzIHx0TI`): probablemente llena `ml_products`/`ml_catalog_match`.
-- **ML - Refresh Token** (`8FTMhepnONqz_wnRbOKkA`): probablemente usa `ml_credentials`.
-- **Chatbot Alfa para la demo** (`HH5EsX3xFPS0MRpp`).
-- **Sistema de cotizaciones Beta** (`MW77WG7BQfXWqeB9`).
-- **Errores en los workflows de Alfa** (`_HWuotoTt1KpZI3LGJA18`): también es el workflow de error de
-  "ML - Refresh Token Miga" y "MIGA - Cotización Personalizada".
+## Otros workflows
 
-## Fases
+| Workflow | Base | Acción en el corte |
+|---|---|---|
+| **ML - sync** (`nsA4A6bnfypPnDzIHx0TI`, cada 2 h) | Postgres: `ml_credentials`, `ml_products`, `ml_catalog_match`, `productos_alfa`, `extensions.unaccent`, `pg_trgm` | Cambiar credencial al oficial |
+| **ML - Refresh Token** (`8FTMhepnONqz_wnRbOKkA`, cada 5 h) | Postgres: `ml_credentials` (user 2095714489) | Cambiar credencial al oficial |
+| Registro Proveedores - Comestibles Alfa | Google Drive + Sheets + Telegram, **sin base de datos** | Nada |
+| Sistema de cotizaciones Beta | Según el dueño, no es de Alfa | Nada |
 
-Cada fase que escriba en el proyecto oficial o en n8n requiere confirmación explícita del dueño.
+**Ojo con el token de Mercado Libre:** el refresh token de ML se puede usar una sola vez. Si
+"ML - Refresh Token" corre contra el origen después de copiar `ml_credentials`, el token copiado
+al destino queda inválido. Por eso, en el corte final hay que pausar ese workflow (y ML - sync)
+antes de copiar y reactivarlos ya apuntando al oficial.
 
-1. **Inventario (solo lectura):** tablas, columnas, filas, índices, funciones, extensiones, RLS y
-   grants de origen y destino, comparados.
-2. **Respaldo:** `pg_dump` completo del proyecto oficial antes de cualquier cambio (fuera de git).
-3. **Esquema:** migraciones SQL idempotentes en `supabase/migrations/` que llevan el destino al
-   esquema del origen (extensiones `vector`/`unaccent`, `f_unaccent()`, `match_documents()`,
-   columnas e índices que falten).
-4. **Datos:** copia de los datos actuales del origen al destino, tabla por tabla, verificando
-   número de filas y dimensión de los embeddings.
-5. **Seguridad:** el widget solo habla con n8n, así que Alfa no necesita acceso anon. RLS activo
-   en todas las tablas sin políticas para anon/authenticated.
-6. **Prueba:** nueva credencial "Supabase Alfa oficial" en n8n y copia del chatbot apuntando al
-   oficial, probada antes de tocar el de producción.
-7. **Corte:** cambiar credenciales del chatbot real (y de ML - sync / Refresh Token si aplica).
-   El proyecto `pgeyfvjmdzvwqdbdvbhn` queda intacto unos días como plan de regreso.
+## Paso a paso
+
+Herramienta: `scripts/migrar_alfa.sh` (probado contra Postgres local: respaldo, comparación,
+copia en una sola transacción, ajuste de secuencias, rechazo si cambian las columnas y
+reversión completa si algo falla). Se puede correr más de una vez: cada copia reemplaza los
+datos del destino con los del origen.
+
+### 1. Preparación (en tu Linux)
+
+Ver comandos en la sección "Comandos" abajo. Resultado esperado: `conexion` muestra ambas bases.
+
+### 2. Respaldo y comparación (solo lectura sobre el origen)
+
+`respaldo` y `comparar`. Compartir con Claude la salida de `comparar` y
+`backups/esquema_diff.txt` (solo esquema, sin datos ni claves).
+
+### 3. Ajuste de esquema
+
+Si hay diferencias, Claude escribe migraciones en `supabase/migrations/` y, con tu OK, las aplica
+en el destino.
+
+### 4. Primera copia (ensayo)
+
+`CONFIRMAR=si ./scripts/migrar_alfa.sh copiar`. Duplicar el chatbot en n8n apuntando al oficial
+y probarlo por su webhook de prueba. Producción sigue en el origen.
+
+### 5. Corte final (~10 min)
+
+1. Pausar en n8n "ML - Refresh Token" y "ML - sync".
+2. Copiar de nuevo (`copiar`) para traer lo último.
+3. Crear en n8n la credencial supabaseApi "Supabase Alfa oficial"
+   (`https://tuulhxyttqadxiamscfq.supabase.co` + service_role key).
+4. Cambiar credenciales:
+   - Chatbot: "BASE DE CONOCIMIENTO Y CONTEXTO" → "Supabase Alfa oficial"; los 6 nodos Postgres y
+     "Postgres Chat Memory" → "Memoria chat Alfa oficial".
+   - ML - sync y ML - Refresh Token: nodos Postgres → "Memoria chat Alfa oficial".
+5. Reactivar ML - Refresh Token y ML - sync. Probar el widget.
+6. El origen `pgeyfvjmdzvwqdbdvbhn` queda intacto unos días como plan de regreso
+   (volver a poner las credenciales anteriores).
+
+## Comandos
+
+```bash
+# Cliente de Postgres 17 (Ubuntu/Debian, repositorio oficial PGDG)
+sudo apt install -y postgresql-common
+sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y
+sudo apt install -y postgresql-client-17
+
+git clone -b claude/alfa-supabase-migration-2p4r2z https://github.com/borosofo/alfa_chat.js.git
+cd alfa_chat.js
+cp .env.example .env   # completar las dos URLs (ver comentarios)
+
+./scripts/migrar_alfa.sh conexion
+./scripts/migrar_alfa.sh respaldo
+./scripts/migrar_alfa.sh comparar
+```
 
 ## Reglas
 
