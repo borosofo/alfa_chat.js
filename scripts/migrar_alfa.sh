@@ -24,11 +24,13 @@ set -a; . ./.env; set +a
 [[ "$TARGET_DB_URL" == *tuulhxyttqadxiamscfq* ]] || { echo "TARGET_DB_URL no es el proyecto oficial tuulhxyttqadxiamscfq"; exit 1; }
 
 # Orden pensado para respetar dependencias entre tablas.
+# conocimiento_alfa NO se copia: en el oficial sus vectores se regeneraron con OpenAI
+# (scripts/reembeber_openai.sh) y los del origen (Ollama, 768 dims) ya no son compatibles.
 TABLAS=(
   productos_alfa tipos_negocio negocio_familias
   recetas receta_ingredientes_alfa receta_ingredientes_externos
   ml_products ml_catalog_match ml_credentials
-  conocimiento_alfa documents n8n_chat_histories
+  documents n8n_chat_histories
 )
 TS=$(date +%Y%m%d_%H%M%S)
 mkdir -p backups
@@ -125,8 +127,6 @@ DO \$\$ DECLARE r record; BEGIN
                    r.seq, r.column_name, r.table_name);
   END LOOP;
 END \$\$;
--- Reconstruir el índice vectorial con los datos reales
-REINDEX TABLE public.conocimiento_alfa;
 COMMIT;
 EOF
       for t in "${TABLAS[@]}"; do echo "ANALYZE public.$t;"; done

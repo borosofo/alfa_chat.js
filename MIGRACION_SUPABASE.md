@@ -71,6 +71,22 @@ Workflow n8n **"Chatbot Alfa - Formato Mejorado"** (`87Jy57D6PgHrWeWOcfMmD`), we
 al destino queda inválido. Por eso, en el corte final hay que pausar ese workflow (y ML - sync)
 antes de copiar y reactivarlos ya apuntando al oficial.
 
+
+## Cambio de embeddings a OpenAI (2026-11-03)
+
+El modelo de Ollama `nomic-embed-text-v2-moe` ya no estaba disponible, así que la base de
+conocimiento dejaba de responder (también en producción). Se cambia a OpenAI
+**`text-embedding-3-small`, 1536 dimensiones** (credencial n8n "OpenAI Alfa").
+
+1. Migración `20261103200000_conocimiento_alfa_embeddings_openai.sql`: columna `embedding` a
+   `vector(1536)` (vacía los vectores viejos).
+2. `./scripts/reembeber_openai.sh`: regenera los vectores de las ~154 filas (costo < 1 centavo USD).
+3. En n8n, el nodo "Embeddings Ollama" se reemplaza por "Embeddings OpenAI" con ese mismo modelo y
+   dimensiones (ya hecho en la copia de prueba; falta en producción, en el corte).
+4. `conocimiento_alfa` ya **no** se copia desde el origen en el corte final.
+5. Cualquier carga futura de documentos a la base de conocimiento debe usar el mismo modelo
+   (`text-embedding-3-small`, 1536), o las búsquedas fallarán por dimensiones distintas.
+
 ## Paso a paso
 
 Herramienta: `scripts/migrar_alfa.sh` (probado contra Postgres local: respaldo, comparación,
