@@ -1,7 +1,32 @@
 # Migración de Alfa al Supabase oficial
 
-Estado: **inventario del destino hecho; falta correr respaldo y comparación contra el origen**.
-Todavía no se ha escrito nada en ninguna base de datos ni en n8n.
+Estado: **corte hecho el 2026-11-03**. El chatbot y los workflows de Mercado Libre ya usan el
+proyecto oficial `tuulhxyttqadxiamscfq`. El proyecto viejo `pgeyfvjmdzvwqdbdvbhn` queda intacto
+como plan de regreso.
+
+### Qué quedó cambiado
+
+| Dónde | Cambio |
+|---|---|
+| Supabase oficial | Migraciones `20261103170000`, `180000`, `190000`, `200000` aplicadas; datos copiados del origen; base de conocimiento con vectores de OpenAI (154/154) |
+| n8n "Chatbot Alfa - Formato Mejorado" | Nodos Postgres y memoria → "Memoria chat Alfa oficial"; base de conocimiento → "Supabase Alfa oficial" (tabla `conocimiento_alfa`); "Embeddings Ollama" → "Embeddings OpenAI" (`text-embedding-3-small`, 1536). Publicado |
+| n8n "ML - sync" y "ML - Refresh Token" | Nodos Postgres → "Memoria chat Alfa oficial". Publicados. ML - sync probado: actualiza `ml_products` en el oficial |
+| n8n "Chatbot Alfa - Formato Mejorado PRUEBA OFICIAL" | Copia de prueba, inactiva (Telegram apagado). Se puede archivar |
+
+### Para volver atrás
+
+En los tres workflows, regresar las credenciales a "Memoria de chatbot de Alfa demo" / "Supabase Alfa"
+y publicar. La base de conocimiento vieja usa Ollama `nomic-embed-text-v2-moe` (768), que habría que
+volver a descargar en Ollama.
+
+### Pendientes
+
+- Revisar que "ML - Refresh Token" corra bien a las 20:00 UTC (15:00 Bogotá) contra el oficial.
+- Proyecto viejo `pgeyfvjmdzvwqdbdvbhn`: tiene RLS apagado en `conocimiento_alfa`,
+  `n8n_chat_histories`, `documents`, `tipos_negocio`, `negocio_familias` (cualquiera con su clave
+  anon puede leer los chats). Cuando se confirme el corte: activar RLS o pausar el proyecto.
+- "Chatbot Alfa para la demo" sigue en el proyecto viejo (decisión pendiente del dueño).
+- Cualquier carga nueva a la base de conocimiento debe usar `text-embedding-3-small` (1536).
 
 ## Objetivo
 
